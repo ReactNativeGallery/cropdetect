@@ -1,6 +1,3 @@
 node_modules
 **/*.gif
-**/*.png
-**/*.jpg
-frames/
 gifs/
