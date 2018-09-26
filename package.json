@@ -7,9 +7,11 @@
   "author": "Xavier Carpentier <contact@xaviercarpentier.com> (http://xaviercarpentier.com/)",
   "license": "MIT",
   "dependencies": {
+    "axios": "0.18.0",
     "body-parser": "1.18.3",
     "express": "4.16.3",
     "gif-frames": "0.4.1",
-    "opencv4nodejs": "4.7.3"
+    "opencv4nodejs": "4.7.3",
+    "stream-to-array": "2.3.0"
   }
 }

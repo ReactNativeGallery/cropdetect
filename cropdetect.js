@@ -1,4 +1,7 @@
 const cv = require('opencv4nodejs')
+const axios = require('axios')
+const gifFrames = require('gif-frames')
+const streamToArrayAsync = require('stream-to-array')
 
 const pngPrefix = 'data:image/jpeg;base64,'
 const jpgPrefix = 'data:image/png;base64,'
@@ -15,13 +18,6 @@ const display = (image) => {
   return this
 }
 
-const decodeFromBase64 = (base64DataString) => {
-  const base64Data = base64DataString.replace(pngPrefix, '').replace(jpgPrefix, '')
-  const buffer = Buffer.from(base64Data, 'base64')
-  const img = cv.imdecode(buffer)
-  return img
-}
-
 const filterRectangle = cont => {
   const peri = cont.arcLength(true)
   const approx = cont.approxPolyDP(0.05 * peri, true)
@@ -30,11 +26,11 @@ const filterRectangle = cont => {
 
 const getCropFromContour = (contour) => {
   const { width, height, x, y } = contour.boundingRect()
-  return { width, height, x, y }
+  const ratio = Number((width / height).toFixed(4))
+  return { width, height, x, y, ratio }
 }
 
-const filterRatio = (maxRatio, minRatio) => ({ height, width }) => {
-  const ratio = width / height
+const filterRatio = (maxRatio, minRatio) => ({ height, width, ratio }) => {
   return ratio < maxRatio && ratio > minRatio
 }
 
@@ -45,9 +41,14 @@ const tap = f => x => {
   return x;
 }
 
-exports.cropdetect = (base64, maxRatio = RATIO_MAX, minRatio = RATIO_MIN) => {
+exports.decodeFromBase64 = (base64DataString) => {
+  const base64Data = base64DataString.replace(pngPrefix, '').replace(jpgPrefix, '')
+  return Buffer.from(base64Data, 'base64')
+}
+
+exports.cropdetect = (buffer, maxRatio = RATIO_MAX, minRatio = RATIO_MIN) => {
   try {
-    const image = decodeFromBase64(base64)
+    const image = cv.imdecode(buffer)
       .cvtColor(cv.COLOR_BGR2GRAY)
       .bilateralFilter(11, 17, 17)
       .canny(10, 250)
@@ -67,6 +68,27 @@ exports.cropdetect = (base64, maxRatio = RATIO_MAX, minRatio = RATIO_MIN) => {
         .find(() => true)
   } catch (error) {
     console.error('[cropdetect]', error)
-    return { error }
+    return { error: error.message }
   }
 }
+
+const getFirstImageStreamAsync = async (url) => {
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer'
+  })
+  const frameData =  await gifFrames({
+    url: Buffer.from(response.data),
+    frames: 0,
+    outputType: 'png'
+  })
+  return frameData[0].getImage()
+}
+
+exports.getImageBufferAsync = async (url) => {
+  const stream = await getFirstImageStreamAsync(url)
+  const parts = await streamToArrayAsync(stream)
+  const buffers = parts.map(part => part instanceof Buffer ? part : Buffer.from(part));
+  return Buffer.concat(buffers);
+}
+
+exports.getFirstImageStreamAsync = getFirstImageStreamAsync
